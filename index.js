@@ -44,9 +44,6 @@ async function askAI(prompt) {
   return data[0].generated_text.trim();
 }
 
-if (typeof data === "object" && data.generated_text) {
-  return data.generated_text.trim();
-}
 
     throw new Error("Empty AI response");
   } catch (err) {
