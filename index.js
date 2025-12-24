@@ -8,7 +8,8 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const HF_TOKEN = process.env.HF_TOKEN;
 
 const HF_MODEL =
-  "https://api-inference.huggingface.co/models/google/flan-t5-base";
+  "https://api-inference.huggingface.co/models/google/flan-t5-small";
+
 
 // ⏱ timeout helper
 function fetchWithTimeout(url, options, timeout = 8000) {
