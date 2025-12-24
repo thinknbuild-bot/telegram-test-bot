@@ -5,45 +5,99 @@ const app = express();
 app.use(express.json());
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
+const HF_TOKEN = process.env.HF_TOKEN;
 
-// Telegram will hit ROOT "/"
+const HF_MODEL =
+  "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2";
+
+// ⏱ timeout helper
+function fetchWithTimeout(url, options, timeout = 8000) {
+  return Promise.race([
+    fetch(url, options),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("AI timeout")), timeout)
+    )
+  ]);
+}
+
+async function askAI(prompt) {
+  try {
+    const res = await fetchWithTimeout(
+      HF_MODEL,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${HF_TOKEN}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          inputs: `Reply briefly and clearly:\n${prompt}`
+        })
+      },
+      8000
+    );
+
+    const data = await res.json();
+
+    if (Array.isArray(data) && data[0]?.generated_text) {
+      return data[0].generated_text.split("\n").slice(-1)[0].trim();
+    }
+
+    throw new Error("Empty AI response");
+  } catch (err) {
+    console.error("⚠️ AI failed:", err.message);
+    return null;
+  }
+}
+
+// Telegram webhook on ROOT
 app.post("/", async (req, res) => {
   console.log("📩 Update received");
 
   const message = req.body.message;
-  if (!message) {
-    return res.sendStatus(200);
-  }
+  if (!message) return res.sendStatus(200);
 
   const chatId = message.chat.id;
-  const text = (message.text || "").toLowerCase();
+  const text = (message.text || "").trim();
+  const lower = text.toLowerCase();
 
-  let reply = "🤖 Bot is alive";
+  let reply;
 
-  if (text.includes("call")) {
+  // 🔴 Call intent ALWAYS wins
+  if (lower.includes("call")) {
     reply = "📞 Call request received (simulation only)";
-  } else if (text.includes("hi") || text.includes("hello")) {
-    reply = "👋 Hi! Bot is working fine.";
   } else {
-    reply = "✅ Message received.";
+    // 🤖 Try AI
+    const aiReply = await askAI(text);
+    reply = aiReply || "🤖 I’m here! Please try again in a moment.";
   }
 
-  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: reply
-    })
-  });
+  try {
+    const tgRes = await fetch(
+      `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: reply
+        })
+      }
+    );
+
+    const tgData = await tgRes.json();
+    console.log("📤 Telegram response:", tgData);
+  } catch (err) {
+    console.error("❌ Telegram send failed:", err);
+  }
 
   res.sendStatus(200);
 });
 
-// Optional GET for browser check
+// Browser check
 app.get("/", (req, res) => {
-  res.send("Telegram bot root endpoint active");
+  res.send("Telegram AI bot running safely");
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("🚀 Server started on root /"));
+app.listen(PORT, () => console.log("🚀 Server started"));
