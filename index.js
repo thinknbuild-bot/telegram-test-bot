@@ -6,9 +6,14 @@ app.use(express.json());
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
-app.post("/webhook", async (req, res) => {
+// Telegram will hit ROOT "/"
+app.post("/", async (req, res) => {
+  console.log("📩 Update received");
+
   const message = req.body.message;
-  if (!message) return res.sendStatus(200);
+  if (!message) {
+    return res.sendStatus(200);
+  }
 
   const chatId = message.chat.id;
   const text = (message.text || "").toLowerCase();
@@ -20,7 +25,7 @@ app.post("/webhook", async (req, res) => {
   } else if (text.includes("hi") || text.includes("hello")) {
     reply = "👋 Hi! Bot is working fine.";
   } else {
-    reply = "✅ Message received. AI temporarily disabled.";
+    reply = "✅ Message received.";
   }
 
   await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -35,7 +40,10 @@ app.post("/webhook", async (req, res) => {
   res.sendStatus(200);
 });
 
-app.get("/", (req, res) => res.send("Bot running"));
+// Optional GET for browser check
+app.get("/", (req, res) => {
+  res.send("Telegram bot root endpoint active");
+});
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Server started"));
+app.listen(PORT, () => console.log("🚀 Server started on root /"));
